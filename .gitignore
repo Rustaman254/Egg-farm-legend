@@ -1,0 +1,41 @@
+# --- Contracts (Foundry) ---
+contracts/cache/
+contracts/out/
+contracts/broadcast/*/31337/
+contracts/lib/
+
+# --- Backend (Go) ---
+backend/.env
+backend/eggfarm-server
+backend/eggfarm-worker
+backend/*.log
+
+# --- Webapp (React/Vite) ---
+webapp/node_modules/
+webapp/dist/
+webapp/.env
+
+# --- Mobile (Flutter) ---
+mobile/dart_define.json
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/**/generated_plugin_registrant.dart
+
+# --- Secrets ---
+.env
+*.pem
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
+.devdata/

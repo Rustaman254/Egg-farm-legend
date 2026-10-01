@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: EggFarm Legends API
+  version: 1.0.0
+  description: >
+    Backend REST API consumed by the Flutter app. Game state (creature hunger, eggs, breeding)
+    is authoritative on-chain; this API is a fast read cache plus the task/reward system.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        "200":
+          description: OK
+
+  /api/players/{wallet}/farm:
+    get:
+      summary: Get a player's farm state (creatures, eggs, feed balance)
+      parameters:
+        - $ref: "#/components/parameters/Wallet"
+      responses:
+        "200":
+          description: Farm state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  creatures:
+                    type: array
+                    items: { $ref: "#/components/schemas/Creature" }
+                  eggs:
+                    type: array
+                    items: { $ref: "#/components/schemas/Egg" }
+                  feedBalance:
+                    type: string
+                    description: 18-decimal $FEED balance, as a decimal string
+
+  /api/players/{wallet}/login:
+    post:
+      summary: Record a daily login (bumps streak, completes the daily_login task)
+      parameters:
+        - $ref: "#/components/parameters/Wallet"
+      responses:
+        "200": { description: OK }
+
+  /api/tasks/{wallet}:
+    get:
+      summary: List today's tasks with this player's progress
+      parameters:
+        - $ref: "#/components/parameters/Wallet"
+      responses:
+        "200":
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TaskProgress" }
+
+  /api/tasks/{wallet}/{taskId}/claim:
+    post:
+      summary: Claim a completed task's $FEED reward (mints on-chain)
+      parameters:
+        - $ref: "#/components/parameters/Wallet"
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Reward minted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  txHash: { type: string }
+        "409":
+          description: Task not completed yet, or reward already claimed
+
+  /api/eggs/preview:
+    get:
+      summary: Preview egg-laying odds for a given happiness level (no gas spent)
+      parameters:
+        - name: happiness
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 100 }
+      responses:
+        "200":
+          description: Odds breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rareUpChancePct: { type: integer }
+                  rottenChancePct: { type: integer }
+                  sameChancePct: { type: integer }
+
+  /api/marketplace/listings:
+    get:
+      summary: Browse active marketplace listings
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [egg, creature] }
+      responses:
+        "200":
+          description: Active listings, cheapest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Listing" }
+
+  /api/leaderboard/top-earners:
+    get:
+      summary: Top sellers by total ARB earned on the marketplace
+      responses:
+        "200": { description: Leaderboard rows }
+
+components:
+  parameters:
+    Wallet:
+      name: wallet
+      in: path
+      required: true
+      schema: { type: string }
+      description: Player's checksummed wallet address
+  schemas:
+    Creature:
+      type: object
+      properties:
+        tokenId: { type: integer }
+        ownerAddress: { type: string }
+        species: { type: integer, description: "0-14, see SpeciesNames" }
+        rarity: { type: integer, minimum: 1, maximum: 5 }
+        breedCount: { type: integer, minimum: 0, maximum: 7 }
+        happiness: { type: integer, minimum: 0, maximum: 100 }
+        hunger: { type: integer, minimum: 0, maximum: 100 }
+        isDead: { type: boolean }
+    Egg:
+      type: object
+      properties:
+        tokenId: { type: integer }
+        ownerAddress: { type: string }
+        rarity: { type: integer }
+        species: { type: integer }
+        hatchTime: { type: string, format: date-time }
+        isRotten: { type: boolean }
+        isHatchable: { type: boolean }
+    TaskProgress:
+      type: object
+      properties:
+        taskId: { type: string }
+        currentCount: { type: integer }
+        targetCount: { type: integer }
+        completedAt: { type: string, format: date-time, nullable: true }
+        rewardClaimed: { type: boolean }
+        rewardFeed: { type: string }
+    Listing:
+      type: object
+      properties:
+        listingId: { type: integer }
+        nftContract: { type: string }
+        tokenId: { type: integer }
+        kind: { type: string, enum: [egg, creature] }
+        sellerAddress: { type: string }
+        priceWei: { type: string }
+        isActive: { type: boolean }

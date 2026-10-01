@@ -1,0 +1,9 @@
+{
+  "API_BASE_URL": "http://10.0.2.2:8080",
+  "ARBITRUM_SEPOLIA_RPC_URL": "https://sepolia-rollup.arbitrum.io/rpc",
+  "FEED_TOKEN_ADDRESS": "",
+  "EGG_NFT_ADDRESS": "",
+  "CREATURE_NFT_ADDRESS": "",
+  "MARKETPLACE_ADDRESS": "",
+  "WALLETCONNECT_PROJECT_ID": "e25dc196e76047fbbb7faf02bfbcd916"
+}
