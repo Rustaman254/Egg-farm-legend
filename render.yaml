@@ -1,0 +1,90 @@
+# Render Blueprint for the Go backend (Render dashboard -> New -> Blueprint -> this repo).
+#
+# Why not Vercel for this part: the API process runs the marketplace/game-state indexers and the
+# wallet watcher as 10-15s polling loops, cmd/worker runs six more, and the arena WebSocket hub
+# keeps connections in memory -- all of which need a process that stays up. Vercel hosts the
+# webapp (see vercel.json); everything here runs always-on from backend/Dockerfile.
+#
+# Values marked `sync: false` are prompted for once when the Blueprint is created. The worker
+# copies them from the API service rather than asking twice.
+
+databases:
+  - name: eggfarm-db
+    databaseName: eggfarm
+    user: eggfarm
+    postgresMajorVersion: "16" # matches docker-compose's postgres:16-alpine
+    region: oregon
+
+services:
+  - name: eggfarm-api
+    type: web
+    runtime: docker
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: eggfarm-server
+    preDeployCommand: eggfarm-migrate
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eggfarm-db
+          property: connectionString
+      - key: CHAIN_ID
+        value: "421614"
+      - key: ARBITRUM_SEPOLIA_RPC_URL
+        value: https://sepolia-rollup.arbitrum.io/rpc
+      # From `forge script script/Deploy.s.sol` (and DeployBattleEscrow.s.sol) output.
+      - key: FEED_TOKEN_ADDRESS
+        sync: false
+      - key: EGG_NFT_ADDRESS
+        sync: false
+      - key: CREATURE_NFT_ADDRESS
+        sync: false
+      - key: MARKETPLACE_ADDRESS
+        sync: false
+      - key: BATTLE_ESCROW_ADDRESS
+        sync: false
+      - key: DEPLOY_BLOCK
+        sync: false
+      - key: TREASURY_ADDRESS
+        sync: false
+      - key: BACKEND_SIGNER_PRIVATE_KEY
+        sync: false
+      - key: ARB_TOKEN_ADDRESS
+        sync: false
+
+  - name: eggfarm-worker
+    type: worker
+    runtime: docker
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: eggfarm-worker
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: eggfarm-db
+          property: connectionString
+      - key: CHAIN_ID
+        value: "421614"
+      - key: ARBITRUM_SEPOLIA_RPC_URL
+        value: https://sepolia-rollup.arbitrum.io/rpc
+      - key: FEED_TOKEN_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: FEED_TOKEN_ADDRESS }
+      - key: EGG_NFT_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: EGG_NFT_ADDRESS }
+      - key: CREATURE_NFT_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: CREATURE_NFT_ADDRESS }
+      - key: MARKETPLACE_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: MARKETPLACE_ADDRESS }
+      - key: BATTLE_ESCROW_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: BATTLE_ESCROW_ADDRESS }
+      - key: DEPLOY_BLOCK
+        fromService: { type: web, name: eggfarm-api, envVarKey: DEPLOY_BLOCK }
+      - key: TREASURY_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: TREASURY_ADDRESS }
+      - key: BACKEND_SIGNER_PRIVATE_KEY
+        fromService: { type: web, name: eggfarm-api, envVarKey: BACKEND_SIGNER_PRIVATE_KEY }
+      - key: ARB_TOKEN_ADDRESS
+        fromService: { type: web, name: eggfarm-api, envVarKey: ARB_TOKEN_ADDRESS }

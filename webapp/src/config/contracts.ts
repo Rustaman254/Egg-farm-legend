@@ -16,11 +16,19 @@ export const CONTRACTS = {
   battleEscrow: requireAddress(import.meta.env.VITE_BATTLE_ESCROW_ADDRESS, 'VITE_BATTLE_ESCROW_ADDRESS'),
 } as const
 
-// On Vercel the backend service is mounted at /api on the same domain as this app (see the root
-// vercel.json), so production builds default to same-origin ('') and every request goes to a
-// relative /api/... path. Local `npm run dev` still talks to `go run ./cmd/server` on :8080.
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : '')
+// The Go backend runs on Render (render.yaml), not Vercel, so production builds need
+// VITE_API_BASE_URL set to its public URL in the Vercel project's environment variables.
+// Local `npm run dev` falls back to `go run ./cmd/server` on :8080.
+function apiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL
+  if (configured) return configured.replace(/\/$/, '')
+  if (!import.meta.env.DEV) {
+    console.warn('VITE_API_BASE_URL is not set (see .env.example) -- API calls will fail until it is')
+  }
+  return 'http://localhost:8080'
+}
+
+export const API_BASE_URL = apiBaseUrl()
 
 // Where Feed Shop purchases and partner-quest funding payments go (see backend's
 // TREASURY_ADDRESS) -- not a game contract, just an EOA, so it's not part of CONTRACTS above.

@@ -158,6 +158,32 @@ cd ../webapp && npm install && npm run dev &
 cd ../mobile && flutter run --dart-define=... (see above)
 ```
 
+## Deployment
+
+| Part | Host | Config |
+|---|---|---|
+| Web app | Vercel | `vercel.json` (services mode, `webapp` service, SPA fallback) |
+| API (`cmd/server`) + indexers + arena WebSocket | Render web service, always-on | `render.yaml` → `eggfarm-api` |
+| Background jobs (`cmd/worker`) | Render background worker | `render.yaml` → `eggfarm-worker` |
+| Postgres 16 | Render Postgres | `render.yaml` → `eggfarm-db` |
+
+The backend isn't on Vercel because it is long-running by design. The API process polls the chain
+every 10–15s (marketplace and game-state indexers, wallet watcher), the worker runs six more
+loops, and the arena WebSocket hub keeps its connections in memory. Vercel functions suspend
+between requests, so all of that would stall.
+
+1. **Backend:** Render dashboard → New → Blueprint → this repo. Fill in the prompted contract
+   addresses, `DEPLOY_BLOCK`, `TREASURY_ADDRESS` and `BACKEND_SIGNER_PRIVATE_KEY`. Every deploy
+   runs `eggfarm-migrate` (`backend/cmd/migrate`) first, which applies `backend/migrations/*.sql`
+   once each.
+2. **Web app:** import the repo into Vercel and set the `VITE_*` variables from
+   `webapp/.env.example`, with `VITE_API_BASE_URL` set to the `eggfarm-api` URL (e.g.
+   `https://eggfarm-api.onrender.com`).
+3. **Mobile:** set `API_BASE_URL` in `mobile/dart_define.json` to the same `eggfarm-api` URL.
+
+Keep `eggfarm-api` at **one instance**. The indexers run inside it, so a second instance would
+process every event twice.
+
 ## What's left for the hackathon submission
 
 - [x] 4 contracts, deployable to Arbitrum Sepolia, 43 passing tests
