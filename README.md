@@ -169,3 +169,4 @@ cd ../mobile && flutter run --dart-define=... (see above)
 - [ ] On-device WalletConnect validation against a real wallet app (mobile) and a real browser
       wallet extension against Arbitrum Sepolia (webapp)
 - [ ] 60s demo video and 5-slide pitch deck (see `docs/pitch/`)
+=======
