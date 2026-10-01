@@ -67,16 +67,32 @@ export function ConnectWalletGate({ children }: { children: (wallet: string) => 
         ) : (
           <>
             {wallet.connectError && <p className="max-w-sm text-xs text-down">{wallet.connectError.message}</p>}
-            <button
-              type="button"
-              onClick={wallet.connect}
-              disabled={wallet.isConnecting}
-              className="card-pop-sm mt-2 flex w-full items-center justify-center gap-2 rounded-full px-7 py-3.5 font-display font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
-              style={{ background: 'var(--color-brand-red)' }}
-            >
-              <Wallet size={18} strokeWidth={2.25} />
-              {wallet.isConnecting ? 'Connecting...' : 'Connect Wallet'}
-            </button>
+            {wallet.wallets.length > 1 && (
+              <p className="text-xs font-bold text-text-muted">Choose a wallet</p>
+            )}
+            <div className="flex w-full flex-col gap-2">
+              {wallet.wallets.map((connector) => (
+                <button
+                  key={connector.uid}
+                  type="button"
+                  onClick={() => wallet.connect(connector)}
+                  disabled={wallet.isConnecting}
+                  className="card-pop-sm flex w-full items-center justify-center gap-2 rounded-full px-7 py-3.5 font-display font-bold text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+                  style={{ background: 'var(--color-brand-red)' }}
+                >
+                  {connector.icon ? (
+                    <img src={connector.icon} alt="" className="h-5 w-5 rounded" draggable={false} />
+                  ) : (
+                    <Wallet size={18} strokeWidth={2.25} />
+                  )}
+                  {wallet.isConnecting
+                    ? 'Connecting...'
+                    : wallet.wallets.length > 1
+                      ? connector.name
+                      : 'Connect Wallet'}
+                </button>
+              ))}
+            </div>
             <p className="text-[11px] font-bold tracking-wide text-text-faint uppercase">MetaMask &amp; other Arbitrum wallets</p>
           </>
         )}
