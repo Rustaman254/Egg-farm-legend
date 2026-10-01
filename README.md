@@ -158,31 +158,37 @@ cd ../webapp && npm install && npm run dev &
 cd ../mobile && flutter run --dart-define=... (see above)
 ```
 
-## Deployment
+## Deployment (free tier)
 
 | Part | Host | Config |
 |---|---|---|
-| Web app | Vercel | `vercel.json` (services mode, `webapp` service, SPA fallback) |
-| API (`cmd/server`) + indexers + arena WebSocket | Render web service, always-on | `render.yaml` → `eggfarm-api` |
-| Background jobs (`cmd/worker`) | Render background worker | `render.yaml` → `eggfarm-worker` |
-| Postgres 16 | Render Postgres | `render.yaml` → `eggfarm-db` |
+| Web app | Vercel (Hobby) | `vercel.json` (services mode, `webapp` service, SPA fallback) |
+| API + indexers + arena WebSocket + background jobs | One Render free web service | `render.yaml` → `eggfarm-api` |
+| Postgres | Supabase free project | `DATABASE_URL` on `eggfarm-api` |
 
-The backend isn't on Vercel because it is long-running by design. The API process polls the chain
-every 10–15s (marketplace and game-state indexers, wallet watcher), the worker runs six more
-loops, and the arena WebSocket hub keeps its connections in memory. Vercel functions suspend
-between requests, so all of that would stall.
+The backend isn't on Vercel because it is long-running by design. It polls the chain every
+10–15s and the arena WebSocket hub keeps its connections in memory, so it needs a process that
+stays up. On Render's free tier one process does everything:
+- `RUN_WORKER=true` runs `cmd/worker`'s jobs inside the API process.
+- `AUTO_MIGRATE=true` creates the tables on startup.
 
-1. **Backend:** Render dashboard → New → Blueprint → this repo. Fill in the prompted contract
-   addresses, `DEPLOY_BLOCK`, `TREASURY_ADDRESS` and `BACKEND_SIGNER_PRIVATE_KEY`. Every deploy
-   runs `eggfarm-migrate` (`backend/cmd/migrate`) first, which applies `backend/migrations/*.sql`
-   once each.
-2. **Web app:** import the repo into Vercel and set the `VITE_*` variables from
-   `webapp/.env.example`, with `VITE_API_BASE_URL` set to the `eggfarm-api` URL (e.g.
-   `https://eggfarm-api.onrender.com`).
-3. **Mobile:** set `API_BASE_URL` in `mobile/dart_define.json` to the same `eggfarm-api` URL.
+1. **Supabase:** create a free project and save its database password. Click **Connect**, copy
+   the **Session pooler** URI (IPv4; the direct one is IPv6-only), fill in the password and
+   append `?sslmode=require`.
+2. **Render:** Dashboard → New → Blueprint → this repo. Paste the Supabase URI as
+   `DATABASE_URL` and fill in the contract addresses, `DEPLOY_BLOCK`, `TREASURY_ADDRESS` and
+   `BACKEND_SIGNER_PRIVATE_KEY`. On first boot the logs show `applied migration ...` for each
+   file, then `api server listening`.
+3. **Keep it awake:** free Render services sleep after 15 minutes without traffic, which would
+   pause the indexers. Add a free UptimeRobot or cron-job.org monitor that loads
+   `https://<eggfarm-api>.onrender.com/healthz` every 10 minutes.
+4. **Vercel:** import the repo and set the `VITE_*` variables from `webapp/.env.example`, with
+   `VITE_API_BASE_URL` set to the Render URL.
+5. **Mobile:** set `API_BASE_URL` in `mobile/dart_define.json` to the same Render URL.
 
-Keep `eggfarm-api` at **one instance**. The indexers run inside it, so a second instance would
-process every event twice.
+Keep `eggfarm-api` at **one instance**. The indexers and jobs run inside it, so a second copy
+would handle every event twice. Don't set `RUN_WORKER=true` while also running `cmd/worker`
+separately.
 
 ## What's left for the hackathon submission
 

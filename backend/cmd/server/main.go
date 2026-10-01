@@ -1,5 +1,6 @@
 // Command server runs the REST API and the Marketplace Indexer. It's the process the Flutter
-// app talks to. Run `cmd/worker` alongside it for the Hunger Service and daily task resets.
+// app talks to. Run `cmd/worker` alongside it for the background services, or set RUN_WORKER=true
+// to run them in this process instead.
 package main
 
 import (
@@ -23,6 +24,7 @@ import (
 	"github.com/eggfarm/backend/internal/services/shop"
 	"github.com/eggfarm/backend/internal/services/task"
 	"github.com/eggfarm/backend/internal/services/walletwatch"
+	"github.com/eggfarm/backend/internal/worker"
 )
 
 func main() {
@@ -41,6 +43,13 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+
+	if cfg.AutoMigrate {
+		if err := db.Migrate(ctx, pool, "migrations"); err != nil {
+			slog.Error("migrating failed", "error", err)
+			os.Exit(1)
+		}
+	}
 
 	chainClient, err := chain.New(ctx, chain.Config{
 		RPCURL:              cfg.RPCURL,
@@ -68,6 +77,10 @@ func main() {
 
 	gameStateIndexer := gamestate.NewIndexer(pool, chainClient, taskSvc, cfg.DeployBlock, cfg.CreatureNFTAddress, cfg.EggNFTAddress)
 	go gameStateIndexer.Run(ctx, 15*time.Second)
+
+	if cfg.RunWorker {
+		worker.Start(ctx, cfg, pool, chainClient, taskSvc)
+	}
 
 	walletWatcher := walletwatch.NewService(pool, chainClient, arenaHub)
 	go walletWatcher.Run(ctx, 10*time.Second)

@@ -41,6 +41,15 @@ type Config struct {
 	// FeedPerNativeUnit is the $FEED-per-ARB(or ETH) exchange rate protocols get when buying
 	// $FEED to fund a partner quest's reward pool (see internal/services/task.FundTask).
 	FeedPerNativeUnit int64
+
+	// RunWorker makes cmd/server also run the background services (internal/worker) in-process,
+	// for hosts with one free instance and no separate background workers. Leave false when
+	// cmd/worker runs on its own, or every job would run twice.
+	RunWorker bool
+
+	// AutoMigrate makes cmd/server apply migrations/*.sql (db.Migrate) before serving, for hosts
+	// without a pre-deploy step. Only for databases created empty -- see db.Migrate.
+	AutoMigrate bool
 }
 
 func Load() (*Config, error) {
@@ -62,6 +71,8 @@ func Load() (*Config, error) {
 		ArbTokenAddress:     os.Getenv("ARB_TOKEN_ADDRESS"),
 		TreasuryAddress:     os.Getenv("TREASURY_ADDRESS"),
 		FeedPerNativeUnit:   getEnvInt64("FEED_PER_NATIVE_UNIT", 100),
+		RunWorker:           getEnvBool("RUN_WORKER"),
+		AutoMigrate:         getEnvBool("AUTO_MIGRATE"),
 	}
 
 	if cfg.FeedTokenAddress == "" || cfg.EggNFTAddress == "" || cfg.CreatureNFTAddress == "" || cfg.MarketplaceAddress == "" {
@@ -88,4 +99,9 @@ func getEnvInt64(key string, fallback int64) int64 {
 		return fallback
 	}
 	return parsed
+}
+
+func getEnvBool(key string) bool {
+	v, err := strconv.ParseBool(os.Getenv(key))
+	return err == nil && v
 }

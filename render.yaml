@@ -1,35 +1,40 @@
-# Render Blueprint for the Go backend (Render dashboard -> New -> Blueprint -> this repo).
+# Render Blueprint for the Go backend, free tier (Render dashboard -> New -> Blueprint -> this repo).
 #
-# Why not Vercel for this part: the API process runs the marketplace/game-state indexers and the
-# wallet watcher as 10-15s polling loops, cmd/worker runs six more, and the arena WebSocket hub
-# keeps connections in memory -- all of which need a process that stays up. Vercel hosts the
-# webapp (see vercel.json); everything here runs always-on from backend/Dockerfile.
+# One free web service runs everything: the REST API, the chain indexers, the arena WebSocket hub,
+# and (RUN_WORKER=true) the background jobs that would otherwise be cmd/worker -- Render's free
+# tier has no background workers. AUTO_MIGRATE=true creates the tables on startup, since free
+# instances have no pre-deploy step. Postgres is Supabase's free tier (Render's own free Postgres
+# is deleted after 30 days), passed in as DATABASE_URL.
 #
-# Values marked `sync: false` are prompted for once when the Blueprint is created. The worker
-# copies them from the API service rather than asking twice.
-
-databases:
-  - name: eggfarm-db
-    databaseName: eggfarm
-    user: eggfarm
-    postgresMajorVersion: "16" # matches docker-compose's postgres:16-alpine
-    region: oregon
+# Free web services sleep after 15 minutes without inbound traffic, which would pause the
+# indexers. Point a free uptime monitor (UptimeRobot, cron-job.org) at /healthz every 10 minutes
+# to keep it awake; one service running 24/7 fits in the free 750 instance-hours a month.
+#
+# Keep this at ONE instance: the indexers and jobs run in-process, so a second copy would handle
+# every event twice.
+#
+# Values marked `sync: false` are prompted for when the Blueprint is created.
 
 services:
   - name: eggfarm-api
     type: web
+    plan: free
     runtime: docker
-    region: oregon
+    region: frankfurt # closest Render region to the Supabase project (eu-west-1)
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     dockerCommand: eggfarm-server
-    preDeployCommand: eggfarm-migrate
     healthCheckPath: /healthz
     envVars:
+      # Supabase -> Connect -> "Session pooler" connection string (port 5432, IPv4), with your
+      # database password filled in and ?sslmode=require appended. Not the transaction pooler
+      # (port 6543, pgbouncer=true): pgx's prepared-statement cache breaks behind it.
       - key: DATABASE_URL
-        fromDatabase:
-          name: eggfarm-db
-          property: connectionString
+        sync: false
+      - key: RUN_WORKER
+        value: "true"
+      - key: AUTO_MIGRATE
+        value: "true"
       - key: CHAIN_ID
         value: "421614"
       - key: ARBITRUM_SEPOLIA_RPC_URL
@@ -53,38 +58,3 @@ services:
         sync: false
       - key: ARB_TOKEN_ADDRESS
         sync: false
-
-  - name: eggfarm-worker
-    type: worker
-    runtime: docker
-    region: oregon
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    dockerCommand: eggfarm-worker
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: eggfarm-db
-          property: connectionString
-      - key: CHAIN_ID
-        value: "421614"
-      - key: ARBITRUM_SEPOLIA_RPC_URL
-        value: https://sepolia-rollup.arbitrum.io/rpc
-      - key: FEED_TOKEN_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: FEED_TOKEN_ADDRESS }
-      - key: EGG_NFT_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: EGG_NFT_ADDRESS }
-      - key: CREATURE_NFT_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: CREATURE_NFT_ADDRESS }
-      - key: MARKETPLACE_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: MARKETPLACE_ADDRESS }
-      - key: BATTLE_ESCROW_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: BATTLE_ESCROW_ADDRESS }
-      - key: DEPLOY_BLOCK
-        fromService: { type: web, name: eggfarm-api, envVarKey: DEPLOY_BLOCK }
-      - key: TREASURY_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: TREASURY_ADDRESS }
-      - key: BACKEND_SIGNER_PRIVATE_KEY
-        fromService: { type: web, name: eggfarm-api, envVarKey: BACKEND_SIGNER_PRIVATE_KEY }
-      - key: ARB_TOKEN_ADDRESS
-        fromService: { type: web, name: eggfarm-api, envVarKey: ARB_TOKEN_ADDRESS }
