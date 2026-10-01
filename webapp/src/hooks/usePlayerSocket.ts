@@ -30,7 +30,10 @@ export function usePlayerSocket(
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let closedByEffect = false
 
-    const wsUrl = `${API_BASE_URL.replace(/^http/, 'ws')}/api/players/${wallet}/ws`
+    // Resolve against the page origin so a same-origin (empty) API_BASE_URL still yields an
+    // absolute ws:// / wss:// URL.
+    const wsUrl = new URL(`${API_BASE_URL}/api/players/${wallet}/ws`, window.location.href)
+    wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:'
 
     function connect() {
       socket = new WebSocket(wsUrl)

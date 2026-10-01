@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "backend": {
+      "root": "backend",
+      "framework": "go"
+    },
+    "webapp": {
+      "root": "webapp",
+      "framework": "vite",
+      "rewrites": [
+        { "source": "/(.*)", "destination": "/index.html" }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/healthz", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "webapp" } }
+  ]
+}
